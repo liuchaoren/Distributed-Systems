@@ -1,0 +1,7 @@
+# To run
+sbt
+run   or   multi-jvm:test-only sample.PingPongSpec
+
+# One-line commands
+sbt run         
+sbt "multi-jvm:test-only sample.PingPongSpec"
