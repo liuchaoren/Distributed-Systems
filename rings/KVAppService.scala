@@ -25,7 +25,7 @@ object KVAppService {
 
     /** Service tier: create app servers */
     val servers = for (i <- 0 to numNodes-1)
-      yield system.actorOf(RingServer.props(i, numNodes, stores, ackEach), "RingServer" + i)
+      yield system.actorOf(GroupServer.props(i, numNodes, stores, ackEach), "RingServer" + i)
 
     /** If you want to initialize a different service instead, that previous line might look like this:
       * yield system.actorOf(GroupServer.props(i, numNodes, stores, ackEach), "GroupServer" + i)
