@@ -5,6 +5,8 @@ import akka.actor.{ActorSystem, ActorRef, Props}
 sealed trait AppServiceAPI
 case class Prime() extends AppServiceAPI
 case class Command() extends AppServiceAPI
+case class Play() extends AppServiceAPI
+case class getNodeNum() extends AppServiceAPI
 case class View(endpoints: Seq[ActorRef]) extends AppServiceAPI
 
 /**
@@ -21,11 +23,11 @@ object KVAppService {
 
     /** Storage tier: create K/V store servers */
     val stores = for (i <- 0 until numNodes)
-      yield system.actorOf(KVStore.props(), "RingStore" + i)
+      yield system.actorOf(KVStore.props(), "GroupStore" + i)
 
     /** Service tier: create app servers */
     val servers = for (i <- 0 to numNodes-1)
-      yield system.actorOf(GroupServer.props(i, numNodes, stores, ackEach), "RingServer" + i)
+      yield system.actorOf(GroupService.props(i, numNodes, stores, ackEach), "GroupServer" + i)
 
     /** If you want to initialize a different service instead, that previous line might look like this:
       * yield system.actorOf(GroupServer.props(i, numNodes, stores, ackEach), "GroupServer" + i)

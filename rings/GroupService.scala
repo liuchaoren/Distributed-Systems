@@ -1,9 +1,15 @@
 package rings
 
 import akka.actor.{Actor, ActorSystem, ActorRef, Props}
+import akka.pattern.ask
+import scala.concurrent.Await
+import akka.util.Timeout
+import scala.concurrent.duration._
 
-class RingCell(var prev: BigInt, var next: BigInt)
-class RingMap extends scala.collection.mutable.HashMap[BigInt, RingCell]
+
+
+// class RingCell(var prev: BigInt, var next: BigInt)
+// class RingMap extends scala.collection.mutable.HashMap[BigInt, RingCell]
 
 /**
  * RingService is an example app service for the actor-based KVStore/KVClient.
@@ -18,26 +24,29 @@ class RingMap extends scala.collection.mutable.HashMap[BigInt, RingCell]
  * @param burstSize number of commands per burst
  */
 
-class GroupServer (val myNodeID: Int, val numNodes: Int, storeServers: Seq[ActorRef], burstSize: Int) extends Actor {
+class GroupService (val myNodeID: Int, val numNodes: Int, storeServers: Seq[ActorRef], burstSize: Int) extends Actor {
   val generator = new scala.util.Random
   val cellstore = new KVClient(storeServers)
-  val dirtycells = new AnyMap
+  // val dirtycells = new AnyMap
   val groupJoinWeight: Int = 70
   val groupJoinTotalWeight: Int = 100
   val numberofgroups: Int = 4
-  val groupidseq: Seq[Int] = for (i <- 0 until numberofgroups)
-  val messageSender: Option[ActorRef] = None
+  // val groupidseq: Seq[Int] = for (i <- 0 until numberofgroups)
+  // val messageSender: Option[ActorRef] = None
+  // var endpoints: Option[Seq[ActorRef]] = None
+  var endpoints: Option[Seq[ActorRef]] = None
+  implicit val timeout = Timeout(60 seconds)
+
 
   var stats = new Stats
   // var groupID: Int = 0
-  var endpoints: Option[Seq[ActorRef]] = None
 
 
   def receive() = {
       case Prime() =>
         {
-          for (groupID <- groupidseq) {
-            sample = generator.NextInt(groupJoinTotalWeight)
+          for (groupID <- 0 until numberofgroups) {
+            val sample = generator.nextInt(groupJoinTotalWeight)
             if (sample < groupJoinWeight) 
               GroupJoin(groupID)
             else 
@@ -50,10 +59,17 @@ class GroupServer (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Actor
       case Command() =>
         incoming(sender)
         command
-      case View(e) =>
-        endpoints = Some(e)
+
       case Play() => 
         play(sender)
+
+      case View(e) =>
+        endpoints = Some(e)
+        // endpoints = e
+
+      // case getNodeNum() => 
+      //   myNodeID
+
   }
 
 
@@ -73,17 +89,35 @@ class GroupServer (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Actor
 
   private def command() = {
     val selectedGroup = generator.nextInt(numberofgroups)
+    // println(s"$selectedGroup")
     for (i <- 0 until numNodes) {
       val key = cellstore.hashForKey(i, selectedGroup)
       val value = directRead(key)
-      if (value == true) 
-        endpoints(i)  ! Play()
+      // println(s"$value")
+      if (value == Some(true))  {
+        // println(s"test")
+        endpoints match {
+          case Some(s) => {
+            val targetS = s(i)
+            // println(s"targetS")
+            targetS ! Play()
+          }
+          case None => "no servers info"
+        }        
+      }
     }
   }
 
-  private def paly(sender:ActorRef) = {
-    val senderID = sender.myNodeID 
-    println(s"GroupServer $senderID ask $myNodeID to play")
+  private def play(sender:ActorRef) = {
+    // val future = sender ? getNodeNum()
+    // val result = Await.result(future, 1 seconds).asInstanceOf[String]
+    // val done = Await.result(future, 60 seconds)
+    // val senderID = sender.self.myNodeID 
+    val sendername = sender.path.name
+    val myname = self.path.name
+    println(s"$sendername asks $myname to play")
+    // println(s"GroupService ask $myNodeID to play")
+
   }
 
   private def incoming(master: ActorRef) = {
@@ -167,7 +201,7 @@ class GroupServer (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Actor
   //   val result = cellstore.write(key, value, coercedMap)
   //   if (result.isEmpty) None else
   //     Some(result.get.asInstanceOf[RingCell])
-  }
+  // }
 
   private def directRead(key: BigInt): Option[Boolean] = {
     val result = cellstore.directRead(key)
@@ -186,7 +220,7 @@ class GroupServer (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Actor
   // }
 }
 
-object GroupServer {
+object GroupService {
   def props(myNodeID: Int, numNodes: Int, storeServers: Seq[ActorRef], burstSize: Int): Props = {
     Props(classOf[GroupService], myNodeID, numNodes, storeServers, burstSize)
   }
