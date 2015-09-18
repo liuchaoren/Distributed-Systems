@@ -6,6 +6,7 @@ import scala.concurrent.Await
 import akka.util.Timeout
 import scala.concurrent.duration._
 
+// class Cell(val ind: Boolean)
 
 
 // class RingCell(var prev: BigInt, var next: BigInt)
@@ -30,7 +31,7 @@ class GroupService (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Acto
   // val dirtycells = new AnyMap
   val groupJoinWeight: Int = 70
   val groupJoinTotalWeight: Int = 100
-  val numberofgroups: Int = 4
+  val numberofgroups: Int = 4 // number of groups 
   // val groupidseq: Seq[Int] = for (i <- 0 until numberofgroups)
   // val messageSender: Option[ActorRef] = None
   // var endpoints: Option[Seq[ActorRef]] = None
@@ -45,6 +46,8 @@ class GroupService (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Acto
   def receive() = {
       case Prime() =>
         {
+          // put actor to groups. every actor can join more than one group.
+          // the probability to join a group is 70/100 = 0.7
           for (groupID <- 0 until numberofgroups) {
             val sample = generator.nextInt(groupJoinTotalWeight)
             if (sample < groupJoinWeight) 
@@ -75,31 +78,30 @@ class GroupService (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Acto
 
 
   private def GroupJoin(groupID: Int) {
+    // groupInd can be true or false. True means actor with myNodeID is in the group of groupID 
+    // false means not in the group of groupID
     val key = cellstore.hashForKey(myNodeID, groupID)
-    val groupInd : Boolean = true
+    val groupInd: Boolean = true
     directWrite(key, groupInd)
         // allocCell
   }
 
   private def GroupLeave(groupID: Int) { 
     val key = cellstore.hashForKey(myNodeID, groupID)
-    val groupInd : Boolean = false
+    val groupInd: Boolean = false
     directWrite(key, groupInd)
   }
 
   private def command() = {
+    // selectedGroup is the ID of the selected group to send messages to 
     val selectedGroup = generator.nextInt(numberofgroups)
-    // println(s"$selectedGroup")
     for (i <- 0 until numNodes) {
       val key = cellstore.hashForKey(i, selectedGroup)
       val value = directRead(key)
-      // println(s"$value")
-      if (value == Some(true))  {
-        // println(s"test")
+      if (value == Some(true) && i != myNodeID)  { // do not send message to actor itself
         endpoints match {
           case Some(s) => {
             val targetS = s(i)
-            // println(s"targetS")
             targetS ! Play()
           }
           case None => "no servers info"
@@ -109,14 +111,9 @@ class GroupService (val myNodeID: Int, val numNodes: Int, storeServers: Seq[Acto
   }
 
   private def play(sender:ActorRef) = {
-    // val future = sender ? getNodeNum()
-    // val result = Await.result(future, 1 seconds).asInstanceOf[String]
-    // val done = Await.result(future, 60 seconds)
-    // val senderID = sender.self.myNodeID 
     val sendername = sender.path.name
     val myname = self.path.name
-    println(s"$sendername asks $myname to play")
-    // println(s"GroupService ask $myNodeID to play")
+    println(s"$sendername asks $myname to play") 
 
   }
 
