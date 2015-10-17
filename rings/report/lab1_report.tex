@@ -1,0 +1,50 @@
+\documentclass[twoside]{article}
+\input{myTemplate}
+
+\newcommand{\lecture}[4]{
+   \pagestyle{myheadings}
+   \thispagestyle{plain}
+   \newpage
+   \setcounter{page}{1}
+   \noindent
+   \begin{center}
+   \framebox{
+      \vbox{\vspace{2mm}
+    \hbox to 6.28in { {\bf CompSci 512: Distributed System\hfill} }
+       \vspace{6mm}
+       \hbox to 6.28in { {\Large \hfill #1 (#2)  \hfill} }
+       \vspace{6mm}
+       \hbox to 6.28in { {\it Lecturer: Jeff Chase #3 \it TA: Max Demoulin \hfill Student: Chaoren Liu #4} }
+      \vspace{2mm}}
+   }
+   \end{center}
+   \markboth{#1}{#1}
+   \vspace*{4mm}
+}
+
+
+\begin{document}
+\lecture{Lab 1 }{09/17/15}{}{}
+
+\section{Do actors ever receive messages originating from a given actor out of order? What if the messages are forwarded through an intermediary?}
+The actors will receive messages from a given actor in order. However, when the messages are forwarded through different intermediaries, the order is indeterministic
+because the time when intermediaries send the message depends on the scheduler. If messages are forwarded through a single intermediary, messages
+will still be received in order. 
+
+\section{What if two actors multicast to the same group? Does each member receive the messages in the same order?}
+Each actor runs as a thread. The scheduling of different threads is indeterministic. When two actors multicast to the same group,  messages received by 
+each member in this group may be in different order. For example, actor 1 (thread 1) multicasts messages to several members (not all) in the target group. Then, the scheduler may switch to run actor 2 (thread 2), which multicasts messages to several members (may be different from the members which have gotten the messages from actor 1) in the target group. Later on, the scheduler may switch back to actor 1 (thread 1) again ... This is all about the thread scheduler. 
+
+
+\section{Do actors ever receive messages for groups "late", after having left the group?}
+Yes. When one message to actor 1 asks it to leave group 1, and before the group affiliation in disk or memory is changed, actor 2 multicast messages to group 1. Since the group affiliation is not yet changed, the actor 2 goes ahead to deliver the message to actor 1. However, the affiliation of actor 1 may get changed before receiving the message from actor 2. In this case, the message is late. 
+
+\section{How does your choice of weights and parameters affect the amount of message traffic?}
+The choice of weight and parameters will affect whether one actor decides to deliver messages to one group and also affect which group one actor will decide to deliver messages to. This will affect the total amount of the messages to be delivered and affect the tranfic to specific groups. 
+
+\section{How can you be sure your code is working, i.e., the right actors are receiving the right messages?}
+To make sure the right actor receives the right message, we can add the ID of the group to the message. When one actor receives the message, it can compare the groupID carried by the message to the groupID set the receiver belongs to. If the groupID (carried by the message) is contained in the groupID set, we will be sure that the message is delivered to the right actor. 
+
+
+
+\end{document}
