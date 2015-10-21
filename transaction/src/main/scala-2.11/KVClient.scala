@@ -5,6 +5,10 @@
 
 package transaction
 
+import java.util.concurrent.TimeoutException
+
+import com.sun.tools.internal.xjc.reader.xmlschema.bindinfo.BIGlobalBinding
+
 import scala.concurrent.duration._
 import scala.concurrent.Await
 
@@ -70,6 +74,11 @@ class KVClient (stores: Seq[ActorRef]) {
     Await.result(future, timeout.duration)
   }
 
+  def acquire(key:BigInt) = {
+    val future = ask(route(key), AcquireAndGet(key)).mapTo[Option[Any]]
+    Await.result(future, timeout.duration)
+  }
+
   import java.security.MessageDigest
 
   /** Generates a convenient hash key for an object to be written to the store.  Each object is created
@@ -91,5 +100,46 @@ class KVClient (stores: Seq[ActorRef]) {
    */
   private def route(key: BigInt): ActorRef = {
     stores((key % stores.length).toInt)
+  }
+
+  def begin(Akey: BigInt, Bkey: BigInt): Tuple2[Option[Any], Option[Any]] = {
+    var AkeyValue: Option[Any] = None
+    var BkeyValue: Option[Any] = None
+    if (Akey < Bkey) {
+//        println("I am reading")
+        AkeyValue = acquire(Akey)
+        BkeyValue = acquire(Bkey)
+    }
+    else {
+        BkeyValue = acquire(Bkey)
+        AkeyValue = acquire(Akey)
+    }
+    return Tuple2(AkeyValue, BkeyValue)
+  }
+
+  def voteOnAKey(key: BigInt): String = {
+    var voteYes = 0
+    var voteNo = 0
+    val S = route(key)
+    val futureA = ask(S, commitVote(key)).mapTo[String]
+    try
+      Await.result(futureA, timeout.duration)
+    catch {
+      //      case TimeoutException => "no"
+      case _ => "no"
+    }
+  }
+
+  def Abort(Akey: BigInt, Bkey: BigInt): Unit = {
+    route(Akey) ! ReleaseKey(Akey)
+    route(Bkey) ! ReleaseKey(Bkey)
+    purge()
+  }
+
+
+  def submit(Akey: BigInt, AkeyValue: Double, Bkey: BigInt, BkeyValue: Double): Unit = {
+    route(Akey) ! PutAndRelease(Akey, AkeyValue)
+    route(Bkey) ! PutAndRelease(Bkey, BkeyValue)
+    purge()
   }
 }

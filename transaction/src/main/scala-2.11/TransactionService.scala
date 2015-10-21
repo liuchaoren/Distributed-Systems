@@ -4,18 +4,28 @@
 package transaction
 
 import akka.actor.{Actor, ActorSystem, ActorRef, Props}
+import scala.concurrent.Future
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import akka.pattern.ask
+import akka.util.Timeout
 
 //class RingCell(var prev: BigInt, var next: BigInt)
 //class RingMap extends scala.collection.mutable.HashMap[BigInt, RingCell]
 
 
 class myTransactionService(val myNodeID: Int, val numNodes: Int, storeServers: Seq[ActorRef], burstSize: Int) extends Actor {
+  import scala.concurrent.ExecutionContext.Implicits.global
   val generator = new scala.util.Random
   val cellstore = new KVClient(storeServers)
   val dirtycells = new AnyMap
   val localWeight: Int = 70
-  val loadNum = 100
-  var numDone = 0
+  val loadNum = 1000
+  var numTDone = 0
+  var numTFail = 0
+//  var voteYes = 0
+//  var voteNo = 0
+  implicit val timeout = Timeout(5 seconds)
 
 //  var stats = new Stats
   var allocated: Int = 0
@@ -38,109 +48,69 @@ class myTransactionService(val myNodeID: Int, val numNodes: Int, storeServers: S
 
     case Command() =>
       incomingTs(sender)
+      sender ! TransAck()
+
+
+//    case voteCommit() =>
+//      println(s"I received a commit vote")
+//      voteYes += 1
+//
+//    case voteAbort() =>
+//      voteNo += 1
+
     case View(e) =>
       endpoints = Some(e)
   }
 
 
   private def incomingTs(master: ActorRef) = {
-    stats.messages += 1
-    if (stats.messages >= burstSize) {
-      master ! BurstAck(myNodeID, stats)
-      stats = new Stats
+//    println(burstSize)
+    for (i <- 0 until burstSize) {
+
+//      voteNo = 0
+//      voteYes = 0
+      var Akey:BigInt = 0
+      var Bkey:BigInt = 0
+      while (Akey == Bkey) {
+        Akey = cellstore.hashForKey(generator.nextInt(numNodes), generator.nextInt(loadNum))
+        Bkey = cellstore.hashForKey(generator.nextInt(numNodes), generator.nextInt(loadNum))
+      }
+//      println(s"haha $Akey")
+//      println(s"haha $Bkey")
+
+      val transfer = generator.nextFloat()
+//      println(s"$Akey")
+      val values = cellstore.begin(Akey, Bkey)
+      val AkeyValue = values._1.get.asInstanceOf[Double] - transfer
+      val BkeyValue = values._2.get.asInstanceOf[Double] + transfer
+
+      val voteA = cellstore.voteOnAKey(Akey)
+//            println(s"I get voteA is $voteA")
+      if (voteA != "yes") {
+        cellstore.Abort(Akey, Bkey)
+        numTFail += 1
+        println(s"Transaction $i of Server$myNodeID Failed")
+      }
+      else {
+        val voteB = cellstore.voteOnAKey(Bkey)
+        if (voteB != "yes") {
+          cellstore.Abort(Akey, Bkey)
+          numTFail += 1
+          println(s"Transaction $i of Server$myNodeID Failed")
+        }
+        else {
+//          println(s"I am submitting T")
+          cellstore.submit(Akey, AkeyValue, Bkey, BkeyValue)
+          numTDone += 1
+          println(s"Transaction $i of Server$myNodeID is done Successfully")
+//          println(s"I am done with T")
+        }
+      }
+
     }
   }
-//
-//  private def allocCell() = {
-//    val key = chooseEmptyCell
-//    var cell = directRead(key)
-//    assert(cell.isEmpty)
-//    val r = new RingCell(0, 1)
-//    stats.allocated += 1
-//    directWrite(key, r)
-//  }
-//
-//  private def chooseEmptyCell(): BigInt =
-//  {
-//    allocated = allocated + 1
-//    cellstore.hashForKey(myNodeID, allocated)
-//  }
-//
-//  /*
-//   * By modifying RingCells in place we may be racing with our k/v servers.  XXX
-//   */
-//  private def touchCell() = {
-//    stats.touches += 1
-//    val key = chooseActiveCell
-//    val cell = directRead(key)
-//    if (cell.isEmpty) {
-//      stats.misses += 1
-//    } else {
-//      val r = cell.get
-//      if (r.next != r.prev + 1) {
-//        stats.errors += 1
-//        r.prev = 0
-//        r.next = 1
-//      } else {
-//        r.next += 1
-//        r.prev += 1
-//      }
-//      directWrite(key, r)
-//    }
-//  }
-//
-//  private def chooseActiveCell(): BigInt = {
-//    val chosenNodeID =
-//      if (generator.nextInt(100) <= localWeight)
-//        myNodeID
-//      else
-//        generator.nextInt(numNodes - 1)
-//
-//    val cellSeq = generator.nextInt(allocated)
-//    cellstore.hashForKey(chosenNodeID, cellSeq)
-//  }
-//
-//  private def rwcheck(key: BigInt, value: RingCell) = {
-//    directWrite(key, value)
-//    val returned = read(key)
-//    if (returned.isEmpty)
-//      println("rwcheck failed: empty read")
-//    else if (returned.get.next != value.next)
-//      println("rwcheck failed: next match")
-//    else if (returned.get.prev != value.prev)
-//      println("rwcheck failed: prev match")
-//    else
-//      println("rwcheck succeeded")
-//  }
-//
-//  private def read(key: BigInt): Option[RingCell] = {
-//    val result = cellstore.read(key)
-//    if (result.isEmpty) None else
-//      Some(result.get.asInstanceOf[RingCell])
-//  }
-//
-//  private def write(key: BigInt, value: RingCell, dirtyset: AnyMap): Option[RingCell] = {
-//    val coercedMap: AnyMap = dirtyset.asInstanceOf[AnyMap]
-//    val result = cellstore.write(key, value, coercedMap)
-//    if (result.isEmpty) None else
-//      Some(result.get.asInstanceOf[RingCell])
-//  }
-//
-//  private def directRead(key: BigInt): Option[RingCell] = {
-//    val result = cellstore.directRead(key)
-//    if (result.isEmpty) None else
-//      Some(result.get.asInstanceOf[RingCell])
-//  }
-//
-//  private def directWrite(key: BigInt, value: RingCell): Option[RingCell] = {
-//    val result = cellstore.directWrite(key, value)
-//    if (result.isEmpty) None else
-//      Some(result.get.asInstanceOf[RingCell])
-//  }
-//
-//  private def push(dirtyset: AnyMap) = {
-//    cellstore.push(dirtyset)
-//  }
+
+
 }
 
 object myTransactionService {

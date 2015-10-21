@@ -7,11 +7,12 @@ import akka.actor.{Actor, ActorSystem, ActorRef, Props}
 import akka.event.Logging
 
 sealed trait LoadMasterAPI
-case class Start(maxPerNode: Int) extends LoadMasterAPI
+case class Start() extends LoadMasterAPI
 //case class BurstAck(senderNodeID: Int, stats: Stats) extends LoadMasterAPI
 case class Join() extends LoadMasterAPI
 case class storesPopu() extends LoadMasterAPI
 case class popAck() extends LoadMasterAPI
+case class TransAck() extends LoadMasterAPI
 
 
 class LoadMaster (val numNodes: Int, val servers: Seq[ActorRef], burstSize: Int) extends Actor {
@@ -39,11 +40,18 @@ class LoadMaster (val numNodes: Int, val servers: Seq[ActorRef], burstSize: Int)
         deactivateInit()
       }
 
+    case TransAck() =>
+      nodesActiveLoad -= 1
+      if (nodesActiveLoad == 0) {
+        deactivate()
+      }
+
+
     case Start() =>
 ////      log.info("Master starting bursts")
 ////      maxPerNode = totalPerNode
       for (s <- servers) {
-        burst(s)
+        s ! Command()
       }
 
 //    case BurstAck(senderNodeID: Int, stats: Stats) =>
@@ -68,22 +76,19 @@ class LoadMaster (val numNodes: Int, val servers: Seq[ActorRef], burstSize: Int)
   }
 
 
-  def burst(server: ActorRef): Unit = {
-    for (i <- 1 to burstSize)
-      server ! Command()
-  }
+//  def burst(server: ActorRef): Unit = {
+//    for (i <- 1 to burstSize)
+//      server ! Command()
+//  }
 
   def deactivateInit() = {
     if(listener.isDefined)
-      listener.get ! "done"
+      listener.get ! "initialize stores are done"
   }
-//  def deactivate() = {
-//    active = false
-//    val total = new Stats
-//    serverStats.foreach(total += _)
-//    if (listener.isDefined)
-//      listener.get ! total
-//  }
+  def deactivate() = {
+    if (listener.isDefined)
+      listener.get ! "transactions are done"
+  }
 }
 
 object LoadMaster {

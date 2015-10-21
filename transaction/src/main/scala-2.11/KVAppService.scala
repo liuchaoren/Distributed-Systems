@@ -13,6 +13,9 @@ case class Play() extends AppServiceAPI
 case class getNodeNum() extends AppServiceAPI
 case class View(endpoints: Seq[ActorRef]) extends AppServiceAPI
 case class LoadStore() extends AppServiceAPI
+case class voteCommit() extends AppServiceAPI
+case class voteAbort() extends AppServiceAPI
+
 
 object KVAppService {
   def apply(system: ActorSystem, numNodes: Int, numStores: Int, loadEach: Int): ActorRef = {
