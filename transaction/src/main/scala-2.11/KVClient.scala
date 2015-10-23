@@ -7,7 +7,7 @@ package transaction
 
 import java.util.concurrent.TimeoutException
 
-import com.sun.tools.internal.xjc.reader.xmlschema.bindinfo.BIGlobalBinding
+//import com.sun.tools.internal.xjc.reader.xmlschema.bindinfo.BIGlobalBinding
 
 import scala.concurrent.duration._
 import scala.concurrent.Await
