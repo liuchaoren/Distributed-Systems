@@ -12,9 +12,9 @@ import akka.pattern.ask
 import akka.util.Timeout
 
 object TestHarness {
-  val numNodes = 100
-  val numStores = 100
-  val burstSize = 100
+  val numNodes = 10
+  val numStores = 10
+  val burstSize = 10
 //  val opsPerNode = 10000
   val system = ActorSystem("Transactions")
   implicit val timeout = Timeout(60 seconds)
@@ -37,14 +37,14 @@ object TestHarness {
   def runUntilDone() = {
     val future = ask(master, Join()).mapTo[String]
     master ! Start()
-    val done = Await.result(future, 60 seconds)
+    val done = Await.result(future, 120 seconds)
     println(s"$done")
   }
 
   def initializeStores() = {
     val future = ask(master, Join()).mapTo[String]
     master ! storesPopu()
-    val done = Await.result(future, 60 seconds)
+    val done = Await.result(future, 120 seconds)
     println(s"$done")
   }
 

@@ -10,7 +10,7 @@ import scala.collection.mutable.Queue
 sealed trait KVStoreAPI
 case class Put(key: BigInt, value: Any) extends KVStoreAPI
 case class Get(key: BigInt) extends KVStoreAPI
-case class commitVote(key: BigInt) extends KVStoreAPI
+case class commitVote(key: BigInt, jobid:Int) extends KVStoreAPI
 case class ReleaseKey(key:BigInt) extends  KVStoreAPI
 case class AcquireAndGet(key:BigInt) extends KVStoreAPI
 case class PutAndRelease(key:BigInt, cell:Any) extends KVStoreAPI
@@ -25,6 +25,7 @@ case class PutAndRelease(key:BigInt, cell:Any) extends KVStoreAPI
 class KVStore extends Actor {
   private val store = new scala.collection.mutable.HashMap[BigInt, Any]
   private val lockQueue = new HashMap[BigInt, Queue[ActorRef]]
+  val generator = new scala.util.Random
 
   override def receive = {
     case Put(key, cell) =>
@@ -44,6 +45,7 @@ class KVStore extends Actor {
       }
       else {
         lockQueue.get(key).get.enqueue(sender)
+//        println(s"$lockQueue")
       }
     case PutAndRelease(key, cell) =>
       store.put(key, cell)
@@ -51,8 +53,14 @@ class KVStore extends Actor {
       keyRelease(key)
 
 
-    case commitVote(key) =>
-      sender ! "yes"
+    case commitVote(key, jobid) =>
+//      val sendername = sender.path.name
+//      if (sendername != "TransactionServer0" || jobid != 1)
+      if (generator.nextInt(10) > 1)
+        sender ! "yes"
+//      else
+//        println(s"I will fail this transaction")
+
   }
 
 
@@ -60,8 +68,10 @@ class KVStore extends Actor {
 //    println(lockQueue.get(key))
     if (lockQueue.get(key).isDefined) {
       lockQueue.get(key).get.dequeue()
-      if (!lockQueue.get(key).get.isEmpty)
+      if (!lockQueue.get(key).get.isEmpty) {
         lockQueue.get(key).get.front ! store.get(key)
+//        println(s"I am return the key to one on the queue")
+      }
     } else
       println("Error")
   }

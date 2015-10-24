@@ -20,7 +20,7 @@ class myTransactionService(val myNodeID: Int, val numNodes: Int, storeServers: S
   val cellstore = new KVClient(storeServers)
   val dirtycells = new AnyMap
   val localWeight: Int = 70
-  val loadNum = 1000
+  val loadNum = 100
   var numTDone = 0
   var numTFail = 0
 //  var voteYes = 0
@@ -64,6 +64,7 @@ class myTransactionService(val myNodeID: Int, val numNodes: Int, storeServers: S
 
 
   private def incomingTs(master: ActorRef) = {
+    val servername = self.path.name
 //    println(burstSize)
     for (i <- 0 until burstSize) {
 
@@ -84,29 +85,28 @@ class myTransactionService(val myNodeID: Int, val numNodes: Int, storeServers: S
       val AkeyValue = values._1.get.asInstanceOf[Double] - transfer
       val BkeyValue = values._2.get.asInstanceOf[Double] + transfer
 
-      val voteA = cellstore.voteOnAKey(Akey)
+      val voteA = cellstore.voteOnAKey(Akey, i)
 //            println(s"I get voteA is $voteA")
       if (voteA != "yes") {
         cellstore.Abort(Akey, Bkey)
         numTFail += 1
-        println(s"Transaction $i of Server$myNodeID Failed")
+        println(s"$servername fails to complete its transaction $i")
       }
       else {
-        val voteB = cellstore.voteOnAKey(Bkey)
+        val voteB = cellstore.voteOnAKey(Bkey, i)
         if (voteB != "yes") {
           cellstore.Abort(Akey, Bkey)
           numTFail += 1
-          println(s"Transaction $i of Server$myNodeID Failed")
+          println(s"$servername fails to complete its transaction $i")
         }
         else {
 //          println(s"I am submitting T")
           cellstore.submit(Akey, AkeyValue, Bkey, BkeyValue)
           numTDone += 1
-          println(s"Transaction $i of Server$myNodeID is done Successfully")
+          println(s"$servername completes its transaction $i successfully")
 //          println(s"I am done with T")
         }
       }
-
     }
   }
 

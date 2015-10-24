@@ -42,6 +42,7 @@ class LoadMaster (val numNodes: Int, val servers: Seq[ActorRef], burstSize: Int)
 
     case TransAck() =>
       nodesActiveLoad -= 1
+      println(s"the number of living actor is $nodesActiveLoad")
       if (nodesActiveLoad == 0) {
         deactivate()
       }

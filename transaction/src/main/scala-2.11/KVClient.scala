@@ -76,7 +76,7 @@ class KVClient (stores: Seq[ActorRef]) {
 
   def acquire(key:BigInt) = {
     val future = ask(route(key), AcquireAndGet(key)).mapTo[Option[Any]]
-    Await.result(future, timeout.duration)
+    Await.result(future, 20 seconds)
   }
 
   import java.security.MessageDigest
@@ -117,13 +117,13 @@ class KVClient (stores: Seq[ActorRef]) {
     return Tuple2(AkeyValue, BkeyValue)
   }
 
-  def voteOnAKey(key: BigInt): String = {
+  def voteOnAKey(key: BigInt, jobid:Int): String = {
     var voteYes = 0
     var voteNo = 0
     val S = route(key)
-    val futureA = ask(S, commitVote(key)).mapTo[String]
+    val futureA = ask(S, commitVote(key, jobid)).mapTo[String]
     try
-      Await.result(futureA, timeout.duration)
+      Await.result(futureA, 2 seconds)
     catch {
       //      case TimeoutException => "no"
       case _ => "no"
